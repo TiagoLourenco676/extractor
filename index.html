@@ -319,9 +319,9 @@
             total_flux: /TOTAL\s+FLUX\s*\(lm\)\s*(\d+(?:\.\d+)?)/i,
             efficiency: /Eff:?\s*(\d+(?:\.\d+)?)\s*lm[\/\\]W/i,
             average_beam_angle: /AVERAGE\s+BEAM\s+ANGLE\s*\(50%\):?\s*(\d+(?:\.\d+)?)\s*DEG/i,
-            max_angle_street: /Max\s*@[^=]*=?\s*(\d+(?:\.\d+)?)\s*DEG\s*STREET\s*SIDE/i,
+            max_angle_street: /Max\s*@[^=]*=?\s*(\d+(?:\.\d+)?)\s*DEG.*?STREET\s*SIDE/i,
             ies_classification: /IES:?\s*([A-Z0-9\-\s]+?)(?=\s*[A-Z]{2,}:|NRB|BUG|$)/i,
-            nrb_classification: /NRB\s*5101:?\s*([A-Z0-9\-\s]+?)(?=\s*[A-Z]{2,}:|IES|BUG|$)/i,
+            nrb_classification: /NRB\s*5101:?\s*([A-Z0-9\[\]\-\s%.]+?)(?=\s*[A-Z]{2,}:|IES|BUG|ISOCANDELA|$)/i,
             bug_rating: /BUG\s*\([^)]*\)\s*Rating\s*([A-Z0-9\-]+)/i,
             luminaire_power: /Luminaire\s+Power:?\s*(\d+(?:\.\d+)?)\s*W/i,
             lor_percentage: /Light\s+Output\s+Ratio:?\s*(\d+(?:\.\d+)?)\s*%/i,
@@ -525,7 +525,11 @@
             const additionalPatterns = {
                 'imax_value': /Imax[:\s]*(\d+(?:\.\d+)?)\s*cd/i,
                 'test_system': /(EVERFINE\s+GO-\d+[A-Z_\d]*)/i,
-                'operator': /Operators?[:\s]*([A-Za-z\s]+?)(?=\s*Test|$)/i
+                'operator': /Operators?[:\s]*([A-Za-z\s]+?)(?=\s*Test|$)/i,
+                // Padrões adicionais mais específicos baseados no PDF
+                'total_flux_alt': /TOTAL\s+FLUX\s*(\d+(?:\.\d+)?)/i,
+                'max_angle_street_alt': /Max\s*@.*?(\d+(?:\.\d+)?)\s*DEG.*?STREET\s*SIDE/i,
+                'nrb_classification_alt': /NRB\s*5101[:\s]*([^A-Z\n\r]+?)(?=\s*[A-Z]{3,}|ISOCANDELA|$)/i
             };
 
             for (const [key, pattern] of Object.entries(additionalPatterns)) {
@@ -534,6 +538,24 @@
                     extracted[key] = cleanTextValue(match[1]);
                 }
             }
+
+            // Tentar padrões alternativos para campos que podem ter falhado
+            if (!extracted.total_flux && extracted.total_flux_alt) {
+                extracted.total_flux = parseFloat(extracted.total_flux_alt);
+            }
+            
+            if (!extracted.max_angle_street && extracted.max_angle_street_alt) {
+                extracted.max_angle_street = parseFloat(extracted.max_angle_street_alt);
+            }
+            
+            if (!extracted.nrb_classification && extracted.nrb_classification_alt) {
+                extracted.nrb_classification = cleanTextValue(extracted.nrb_classification_alt);
+            }
+
+            // Limpar campos temporários
+            delete extracted.total_flux_alt;
+            delete extracted.max_angle_street_alt;
+            delete extracted.nrb_classification_alt;
 
             return extracted;
         }
