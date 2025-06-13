@@ -257,6 +257,9 @@
         <div class="header">
             <h1>🔍 Extrator de Dados Fotométricos</h1>
             <p>Extraia dados de relatórios PDF/GOS da EVERFINE automaticamente</p>
+            <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                Versão 2.1.0 | Atualizado em 13/06/2025
+            </div>
         </div>
 
         <div class="main-content">
@@ -287,6 +290,12 @@
                     <button class="btn" onclick="downloadJSON()">📄 Baixar JSON</button>
                     <button class="btn" onclick="downloadCSV()">📊 Baixar CSV</button>
                     <button class="btn" onclick="copyToClipboard()">📋 Copiar JSON</button>
+                    <button class="btn" onclick="toggleDebugLogs()" style="background: #666;">🔍 Debug Logs</button>
+                </div>
+
+                <div id="debugLogs" style="display: none; margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px; font-family: monospace; font-size: 0.85em; max-height: 300px; overflow-y: auto;">
+                    <h4>📋 Logs de Debug</h4>
+                    <div id="debugContent"></div>
                 </div>
 
                 <div style="margin-top: 30px; padding: 20px; background: #f0f8ff; border-radius: 10px; border-left: 5px solid #4facfe;">
@@ -307,6 +316,26 @@
     <script>
         let extractedData = {};
         let allResults = {};
+        let debugLogs = [];
+
+        // Capturar console.log para debug
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            debugLogs.push(args.join(' '));
+            originalConsoleLog.apply(console, args);
+        };
+
+        function toggleDebugLogs() {
+            const logsDiv = document.getElementById('debugLogs');
+            const content = document.getElementById('debugContent');
+            
+            if (logsDiv.style.display === 'none') {
+                logsDiv.style.display = 'block';
+                content.innerHTML = debugLogs.map(log => `<div>${log}</div>`).join('');
+            } else {
+                logsDiv.style.display = 'none';
+            }
+        }
 
         // Padrões regex para extração de dados (melhorados e limpos)
         const patterns = {
@@ -316,7 +345,7 @@
             power_factor: /PF:?\s*(\d+(?:\.\d+)?)/i,
             frequency: /Freq:?\s*(\d+(?:\.\d+)?)\s*Hz/i,
             lamp_flux: /Lamp\s+Flux:?\s*(\d+(?:\.\d+)?)\s*(?:x\d+)?\s*lm/i,
-            total_flux: /TOTAL\s+FLUX\s*\(lm\)\s*(\d+(?:\.\d+)?)/i,
+            total_flux: /TOTAL\s+FLUX\s*(?:\(lm\))?\s*(\d+(?:\.\d+)?)/i,
             efficiency: /Eff:?\s*(\d+(?:\.\d+)?)\s*lm[\/\\]W/i,
             average_beam_angle: /AVERAGE\s+BEAM\s+ANGLE\s*\(50%\):?\s*(\d+(?:\.\d+)?)\s*DEG/i,
             max_angle_street: /Max\s*@[^=]*=?\s*(\d+(?:\.\d+)?)\s*DEG.*?STREET\s*SIDE/i,
@@ -374,6 +403,9 @@
 
         async function processFiles(files) {
             if (files.length === 0) return;
+
+            // Limpar logs de debug anteriores
+            debugLogs = [];
 
             showLoading();
             allResults = {};
@@ -501,6 +533,8 @@
                 .replace(/\s+/g, ' ') // Normaliza espaços
                 .trim();
 
+            console.log('Texto normalizado (primeiros 500 chars):', text.substring(0, 500));
+
             // Aplicar cada padrão regex
             for (const [key, pattern] of Object.entries(patterns)) {
                 const match = text.match(pattern);
@@ -518,6 +552,8 @@
                     } else {
                         extracted[key] = value;
                     }
+                    
+                    console.log(`Extraído ${key}:`, extracted[key]);
                 }
             }
 
@@ -526,8 +562,13 @@
                 'imax_value': /Imax[:\s]*(\d+(?:\.\d+)?)\s*cd/i,
                 'test_system': /(EVERFINE\s+GO-\d+[A-Z_\d]*)/i,
                 'operator': /Operators?[:\s]*([A-Za-z\s]+?)(?=\s*Test|$)/i,
+                // Múltiplos padrões para fluxo total
+                'total_flux_v1': /TOTAL\s+FLUX\s*(\d+(?:\.\d+)?)/i,
+                'total_flux_v2': /LOR\(.*?\)\s*(\d+(?:\.\d+)?)/i,
+                'total_flux_v3': /(\d+(?:\.\d+)?)\s*lm.*?TOTAL/i,
+                'total_flux_v4': /TOTAL.*?(\d+(?:\.\d+)?)\s*lm/i,
+                'total_flux_v5': /FLUX.*?(\d+(?:\.\d+)?)(?:\s*lm)?$/mi,
                 // Padrões adicionais mais específicos baseados no PDF
-                'total_flux_alt': /TOTAL\s+FLUX\s*(\d+(?:\.\d+)?)/i,
                 'max_angle_street_alt': /Max\s*@.*?(\d+(?:\.\d+)?)\s*DEG.*?STREET\s*SIDE/i,
                 'nrb_classification_alt': /NRB\s*5101[:\s]*([^A-Z\n\r]+?)(?=\s*[A-Z]{3,}|ISOCANDELA|$)/i
             };
@@ -536,12 +577,37 @@
                 const match = text.match(pattern);
                 if (match) {
                     extracted[key] = cleanTextValue(match[1]);
+                    console.log(`Extraído (adicional) ${key}:`, extracted[key]);
                 }
             }
 
             // Tentar padrões alternativos para campos que podem ter falhado
-            if (!extracted.total_flux && extracted.total_flux_alt) {
-                extracted.total_flux = parseFloat(extracted.total_flux_alt);
+            if (!extracted.total_flux) {
+                console.log('Total flux não encontrado, tentando padrões alternativos...');
+                
+                // Tentar múltiplos padrões para fluxo total
+                const totalFluxCandidates = [
+                    extracted.total_flux_v1,
+                    extracted.total_flux_v2, 
+                    extracted.total_flux_v3,
+                    extracted.total_flux_v4,
+                    extracted.total_flux_v5
+                ].filter(v => v && !isNaN(parseFloat(v)));
+                
+                console.log('Candidatos de fluxo total encontrados:', totalFluxCandidates);
+                
+                if (totalFluxCandidates.length > 0) {
+                    // Pegar o maior valor que faça sentido (normalmente fluxo total é > 1000 lm)
+                    const validFlux = totalFluxCandidates
+                        .map(v => parseFloat(v))
+                        .filter(v => v > 100) // Filtrar valores muito pequenos
+                        .sort((a, b) => b - a)[0]; // Pegar o maior
+                    
+                    if (validFlux) {
+                        extracted.total_flux = validFlux;
+                        console.log('Fluxo total definido como:', validFlux);
+                    }
+                }
             }
             
             if (!extracted.max_angle_street && extracted.max_angle_street_alt) {
@@ -553,10 +619,12 @@
             }
 
             // Limpar campos temporários
-            delete extracted.total_flux_alt;
-            delete extracted.max_angle_street_alt;
-            delete extracted.nrb_classification_alt;
+            ['total_flux_v1', 'total_flux_v2', 'total_flux_v3', 'total_flux_v4', 'total_flux_v5',
+             'max_angle_street_alt', 'nrb_classification_alt'].forEach(key => {
+                delete extracted[key];
+            });
 
+            console.log('Dados extraídos finais:', extracted);
             return extracted;
         }
 
