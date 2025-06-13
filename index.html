@@ -275,7 +275,7 @@
             <div class="results-container" id="resultsContainer">
                 <div class="results-header">
                     <h2>📊 Dados Extraídos</h2>
-                    <p>Resultados da análise dos seus arquivos Excel</p>
+                    <p>Resultados da análise dos seus arquivos</p>
                 </div>
 
                 <div class="results-grid" id="resultsGrid">
@@ -308,33 +308,33 @@
         let extractedData = {};
         let allResults = {};
 
-        // Padrões regex para extração de dados (otimizados para PDF/GOS)
+        // Padrões regex para extração de dados (melhorados e limpos)
         const patterns = {
-            voltage: /(?:Test:?\s*)?U:?\s*(\d+\.?\d*)\s*V/i,
-            current: /(?:Test:?\s*)?I:?\s*(\d+\.?\d*)\s*A/i,
-            power: /(?:Test:?\s*)?P:?\s*(\d+\.?\d*)\s*W/i,
-            power_factor: /PF:?\s*(\d+\.?\d*)/i,
-            frequency: /Freq:?\s*(\d+\.?\d*)\s*Hz/i,
-            lamp_flux: /Lamp\s+Flux:?\s*(\d+\.?\d*)\s*(?:x\d+)?\s*lm/i,
-            total_flux: /TOTAL\s+FLUX\s*\(lm\)\s*(\d+)/i,
-            efficiency: /Eff:?\s*(\d+\.?\d*)\s*lm[\/\\]W/i,
-            average_beam_angle: /AVERAGE\s+BEAM\s+ANGLE\s*\(50%\):?\s*(\d+\.?\d*)\s*DEG/i,
-            max_angle_street: /Max\s*@[^=]*=?\s*(\d+\.?\d*)\s*DEG\s*STREET\s*SIDE/i,
-            ies_classification: /IES:?\s*([^\n\r,]+?)(?=\s*[A-Z]{2,}:|$)/i,
-            nrb_classification: /NRB\s*5101:?\s*([^\n\r,]+?)(?=\s*[A-Z]{2,}:|$)/i,
+            voltage: /(?:Test:?\s*)?U:?\s*(\d+(?:\.\d+)?)\s*V/i,
+            current: /(?:Test:?\s*)?I:?\s*(\d+(?:\.\d+)?)\s*A/i,
+            power: /(?:Test:?\s*)?P:?\s*(\d+(?:\.\d+)?)\s*W/i,
+            power_factor: /PF:?\s*(\d+(?:\.\d+)?)/i,
+            frequency: /Freq:?\s*(\d+(?:\.\d+)?)\s*Hz/i,
+            lamp_flux: /Lamp\s+Flux:?\s*(\d+(?:\.\d+)?)\s*(?:x\d+)?\s*lm/i,
+            total_flux: /TOTAL\s+FLUX\s*\(lm\)\s*(\d+(?:\.\d+)?)/i,
+            efficiency: /Eff:?\s*(\d+(?:\.\d+)?)\s*lm[\/\\]W/i,
+            average_beam_angle: /AVERAGE\s+BEAM\s+ANGLE\s*\(50%\):?\s*(\d+(?:\.\d+)?)\s*DEG/i,
+            max_angle_street: /Max\s*@[^=]*=?\s*(\d+(?:\.\d+)?)\s*DEG\s*STREET\s*SIDE/i,
+            ies_classification: /IES:?\s*([A-Z0-9\-\s]+?)(?=\s*[A-Z]{2,}:|NRB|BUG|$)/i,
+            nrb_classification: /NRB\s*5101:?\s*([A-Z0-9\-\s]+?)(?=\s*[A-Z]{2,}:|IES|BUG|$)/i,
             bug_rating: /BUG\s*\([^)]*\)\s*Rating\s*([A-Z0-9\-]+)/i,
-            luminaire_power: /Luminaire\s+Power:?\s*(\d+\.?\d*)\s*W/i,
-            lor_percentage: /Light\s+Output\s+Ratio:?\s*(\d+\.?\d*)\s*%/i,
-            street_down: /street[_\s]*down\s*\(%?\):?\s*(\d+\.?\d*)/i,
-            street_up: /street[_\s]*up\s*\(%?\):?\s*(\d+\.?\d*)/i,
-            house_down: /house[_\s]*down\s*\(%?\):?\s*(\d+\.?\d*)/i,
-            house_up: /house[_\s]*up\s*\(%?\):?\s*(\d+\.?\d*)/i,
-            // Padrões adicionais para EVERFINE
-            model_name: /NAME:?\s*([^\n\r]+?)(?=\s*SPEC:|$)/i,
-            manufacturer: /MFR\.?:?\s*([^\n\r]+?)(?=\s*TYPE:|$)/i,
-            test_date: /Test\s+Date:?\s*(\d{1,2}\s+\w+\s+\d{4})/i,
-            temperature: /Temperature:?\s*(\d+\.?\d*)\s*DEG/i,
-            humidity: /Humidity:?\s*(\d+\.?\d*)\s*%/i
+            luminaire_power: /Luminaire\s+Power:?\s*(\d+(?:\.\d+)?)\s*W/i,
+            lor_percentage: /Light\s+Output\s+Ratio:?\s*(\d+(?:\.\d+)?)\s*%/i,
+            street_down: /street[_\s]*down\s*\(%?\):?\s*(\d+(?:\.\d+)?)/i,
+            street_up: /street[_\s]*up\s*\(%?\):?\s*(\d+(?:\.\d+)?)/i,
+            house_down: /house[_\s]*down\s*\(%?\):?\s*(\d+(?:\.\d+)?)/i,
+            house_up: /house[_\s]*up\s*\(%?\):?\s*(\d+(?:\.\d+)?)/i,
+            // Padrões melhorados para dados específicos
+            model_name: /(?:NAME|Model):?\s*([A-Za-z0-9\-_\s]+?)(?=\s*(?:MFR|SPEC|Manufacturer)|$)/i,
+            manufacturer: /(?:MFR\.?|Manufacturer):?\s*([A-Za-z0-9\-_\s&.,]+?)(?=\s*(?:TYPE|Model|Test|NAME)|$)/i,
+            test_date: /Test\s+Date:?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{4}|\d{1,2}\s+\w+\s+\d{4})/i,
+            temperature: /Temperature:?\s*(\d+(?:\.\d+)?)\s*(?:DEG|°C|C)/i,
+            humidity: /Humidity:?\s*(\d+(?:\.\d+)?)\s*%/i
         };
 
         // Configuração do upload
@@ -494,8 +494,12 @@
         function extractDataFromText(text) {
             const extracted = {};
 
-            // Limpar e normalizar o texto
-            text = text.replace(/\s+/g, ' ').trim();
+            // Limpar e normalizar o texto - remover caracteres especiais problemáticos
+            text = text
+                .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ') // Remove caracteres de controle
+                .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, ' ') // Remove caracteres não imprimíveis
+                .replace(/\s+/g, ' ') // Normaliza espaços
+                .trim();
 
             // Aplicar cada padrão regex
             for (const [key, pattern] of Object.entries(patterns)) {
@@ -503,12 +507,15 @@
                 if (match) {
                     let value = match[1].trim();
                     
+                    // Limpeza adicional para campos de texto
+                    if (key === 'manufacturer' || key === 'model_name') {
+                        value = cleanTextValue(value);
+                    }
+                    
                     // Tentar converter para número
-                    if (/^\d+\.?\d*$/.test(value)) {
+                    if (/^\d+(?:\.\d+)?$/.test(value)) {
                         extracted[key] = parseFloat(value);
                     } else {
-                        // Limpar texto para classificações
-                        value = value.replace(/\s+/g, ' ').trim();
                         extracted[key] = value;
                     }
                 }
@@ -516,19 +523,39 @@
 
             // Detectar dados adicionais específicos da EVERFINE
             const additionalPatterns = {
-                'imax_value': /Imax[:\s]*(\d+\.?\d*)\s*cd/i,
+                'imax_value': /Imax[:\s]*(\d+(?:\.\d+)?)\s*cd/i,
                 'test_system': /(EVERFINE\s+GO-\d+[A-Z_\d]*)/i,
-                'operator': /Operators?[:\s]*([^\n\r]+?)(?=\s*Test|$)/i
+                'operator': /Operators?[:\s]*([A-Za-z\s]+?)(?=\s*Test|$)/i
             };
 
             for (const [key, pattern] of Object.entries(additionalPatterns)) {
                 const match = text.match(pattern);
                 if (match) {
-                    extracted[key] = match[1].trim();
+                    extracted[key] = cleanTextValue(match[1]);
                 }
             }
 
             return extracted;
+        }
+
+        // Função para limpar valores de texto
+        function cleanTextValue(value) {
+            if (!value) return '';
+            
+            return value
+                // Remove caracteres especiais indesejados
+                .replace(/[^\w\s\-.,&]/g, ' ')
+                // Remove sequências de caracteres repetidos
+                .replace(/(.)\1{3,}/g, '$1')
+                // Normaliza espaços
+                .replace(/\s+/g, ' ')
+                // Remove espaços no início e fim
+                .trim()
+                // Remove palavras com menos de 2 caracteres que não sejam números
+                .replace(/\b[a-zA-Z]\b/g, '')
+                // Limpa espaços duplos novamente
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
         function displayResults() {
@@ -551,10 +578,16 @@
                 const card = document.createElement('div');
                 card.className = 'data-card';
                 
+                // Só mostra modelo e fabricante se os dados estão limpos e válidos
+                const modelInfo = (data.model_name && data.model_name.length > 2) ? 
+                    `<p><strong>Modelo:</strong> ${data.model_name}</p>` : '';
+                const manufacturerInfo = (data.manufacturer && data.manufacturer.length > 2) ? 
+                    `<p><strong>Fabricante:</strong> ${data.manufacturer}</p>` : '';
+                
                 card.innerHTML = `
                     <h3>📄 ${fileName}</h3>
-                    ${data.model_name ? `<p><strong>Modelo:</strong> ${data.model_name}</p>` : ''}
-                    ${data.manufacturer ? `<p><strong>Fabricante:</strong> ${data.manufacturer}</p>` : ''}
+                    ${modelInfo}
+                    ${manufacturerInfo}
                     
                     ${createDataSection('⚡ Dados Elétricos', {
                         'Tensão': data.voltage ? `${data.voltage} V` : 'N/A',
